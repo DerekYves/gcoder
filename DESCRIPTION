@@ -1,0 +1,13 @@
+Package: gcoder
+Type: Package
+Title: Tools for Geocoding an Address Vector using the Google for Work API
+Version: 0.1.0
+Author: Derek Darves
+Maintainer: Derek Darves <darves@gmail.com>
+Description: The main purpose of this package is to provide a means to encode a
+    vector of physical addresses into "URL-safe" base64 using one's Google for Work
+    private key.
+License: GPL-3
+LazyData: TRUE
+Imports: RCurl, RJSONIO, base64enc, digest, urltools, stringi
+RoxygenNote: 5.0.1.9000
