@@ -1,108 +1,162 @@
-#' Build fully formed URLs for geocoding using one's Google for Work private API key.
+#' Generates digital signatures for Google Maps API calls.
 #'
-#' This function creates a fully formed vector of URLs encoded with your
-#' \href{https://www.google.com/work/}{Google for Work} private API key.
-#' The general pattern of this function follows the \href{https://developers.google.com/maps/documentation/business/image/auth?hl=en}{Google Developer documention}
-#' for generating a digital signature. Prior to applying this function you may need to strip your address vector of non-URL-safe string values (see: ).
-#
+#' This function, primarily, is a helper for \code{\link{drive_time}} and \code{\link{geocode_url}}.
+#' It is only necessary when building digital signatures with the private cryptographic key associated with
+#' your (paid) \href{https://www.google.com/work/}{Google for Work} account. To build valid signatures your vector of addresses must be url
+#' encoded (see: \code{\link{url_encode}} and contain "web-safe" UTF-8 characters
+#' (see: \code{\link{address_cleaner}}). For basic geocoding and distance analyses it is generally easier to use \code{\link{drive_time}} and \code{\link{geocode_url}}
+#' to encode a request with your Google for Work private key. However, and particularly with large batch jobs,
+#' it can be useful to inspect the output of this function for malformed values which yield invalid signatures (see the "sigfile" option).
 
-#' @param address A 1xN locations vector with UTF-8 encoded ASCII-characters (see: ).
-#' @param privkey Your Google for Work API key
-#' @param clientid This parameter is generall of the form 'gme-[company]'
-#' @param sigfile Save out a complete file of locations and URL signatures (this can be useful for debugging malformed URLs)?
-#' @param sigfile_loc A fully formed folder/file location to save the function's output. If NULL and sigfile=TRUE, file is saved as "signature_file_[date-time].Rds" in the current working directory.
-#' @param verbose Displays additional progress output
-#'
+#' The general pattern of this function follows the \href{https://developers.google.com/maps/documentation/business/image/auth?hl=en}{Google Developer documention}
+#' for generating a digital signature witgh Python.
+
+#' @param address A 1xN vector of UTF-8 \emph{url encoded} addresses (if gmode='dtime', this is the origin address).
+#' @param dest If gmode is 'dtime', this is the destination address.
+#' @param gmode character string; must be either "geocode" (the default) or "dtime" (for distance requests).
+#' @param privkey character string; your Google for Work API key
+#' @param clientid character string; generally, this ID will be of the form 'gme-[company]'.
+#' @param debug logical; when \emph{TRUE}, returns a complete data frame of locations and their associated URL signatures (this can be useful for debugging invalid signatures).
+#' @param verbose logical; when \emph{TRUE}, displays additional progress output.
+#' @param travel_mode character string; currently, valid values include (\href{https://developers.google.com/maps/documentation/javascript/distancematrix#distance_matrix_requests}{see this page for details}):
+#'   \itemize{
+#'   \item driving (the default): indicates standard driving directions using the road network.
+#'   \item transit: requests directions via public transit routes.
+#'   \item walking: requests walking directions via pedestrian paths & sidewalks (where available).
+#'   \item bicycling: requests bicycling directions via bicycle paths & preferred streets (currently only available in the US and some Canadian cities).
+#'         }
+#' @param units character string; must be either "metric" (the default) or "imperial".
+#' Specifying "metric" will return distance between origin and destination as kilometers,
+#' whereas "imperial" returns distance in miles. For geocode requests this parameter
+#' is ignorned if non-null.
+#' @param language character string; localization of the returned object. This set to "en-EN" by default, but refer to
+#' \href{https://developers.google.com/maps/faq#using-google-maps-apis}{this page}
+#' for an up-to-date list of all supported languages.
+
 #' @importFrom digest hmac
 #' @importFrom urltools url_encode
 #' @importFrom RCurl base64Decode
 #' @importFrom base64enc base64encode
 #' @export
 
+google_encode64 <- function(address, dest=NULL, gmode="geocode", privkey=NULL,
+							clientid=NULL, debug = FALSE, verbose = FALSE,
+							travel_mode="driving", units="metric",
+							language="en-EN"){
 
-google_encode64 <-
-	function(address, privkey, clientid, sigfile = FALSE, sigfile_loc = NULL,
-			 verbose = FALSE) {
-		if (sigfile == TRUE &
-			is.null(sigfile_loc))
-			sigfile_loc <- paste0("signature_file_", Sys.time(), ".Rds")
+	options(stringsAsFactors=F)
 
-		# Load the vector of locations to geocode
+	# Input validation
+	if(is.null(clientid))
+		stop("You must specify a client ID to encode the URL!")
+	if(is.null(privkey))
+		stop("You must specify a Google for work API key to encode the URL!")
+	if(!grepl("geocode|dtime", gmode))
+		stop("gmode must be set as \'geocode\' or \'dtime\'.")
+	if(!is.vector(address, mode="character"))
+		stop("Address must be url encoded character vectors!")
+	if(gmode=="dtime"){
+		if(!is.vector(dest, mode="character"))
+			stop("Address must be url encoded character vectors!")
+		if(!grepl("metric|imperial", units))
+			stop("Invalid units paramater. Must be 'metric' or 'imperial'")
+		if(length(address)>1 & length(address)!=length(dest))
+			stop("Address must be singular or the same length as destination!")
+	}
+
+	# Build the data.frame for encoding
+	if(gmode == "geocode") {
 		x <- data.frame(locations=address)
+	} else if(gmode == "dtime") {
+		x <- data.frame(address=address, dest=dest)
+	}
 
-		if (verbose)
-			cat("\nNumber of records to geocode: ", nrow(x), "\n")
+	if(verbose)
+		cat("Number of digitial signatures to that will be generated:", nrow(x), "\n")
 
-		# The steps below follow:
-		# https://developers.google.com/maps/documentation/business/image/auth?hl=en
+	# The steps below follow this Google support manual:
+	# https://developers.google.com/maps/premium/previous-licenses/webservices/auth#client_id_and_signature
 
-		#####################################################################
-		# Step (1): Set URL parameters:
-		#     Note 1: Any non-standard characters need to be URL-encoded.
-		#     Note 2: All Google services require UTF-8 character encoding.
+	#####################################################################
+	# Step (1): Set URL parameters:
+	#     Note 1: Any non-standard characters need to be URL-encoded.
+	#     Note 2: All Google services require UTF-8 character encoding.
 
-		x$domain  <- "https://maps.googleapis.com"
+	x$domain  <- "https://maps.googleapis.com"
+	x$client  <- paste0("&client=", clientid)
+
+	if(gmode == "geocode"){
 		x$url     <- "/maps/api/geocode/json?address="
-		x$url_location <- urltools::url_encode(x$locations)
-		x$client  <- paste0("&client=", clientid)
+	} else if(gmode == "dtime") {
+		x$url     <- "/maps/api/distancematrix/json?origins="
+	}
 
-		#####################################################################
-		# (2) Strip off the domain portion of request and create the url to sign:
-		x$tosign <- with(x, paste0(url, url_location, client))
+	#####################################################################
+	# (2) Strip off the domain portion of request and create the URL to be signed:
 
-		#####################################################################
-		# (3) Encode the private key in "url-safe" Base64.
-		#     Note 1: "url-safe" keys replace '+' and '/' with '-' and '_' respectively.
-		#     Note 2: base::base64decode does not work; base64Decode from RCurl needed.
-		#     Note 3: RCurl's base64Decoder is not URL safe; therefore, gsub is needed.
-		#See: http://stackoverflow.com/questions/28376071/url-safe-base64-decoding-for-r
-		b64dkey   <- RCurl::base64Decode(gsub("-", "+", gsub("_", "/", privkey)))
-		x$b64dkey <- b64dkey
-
-		#####################################################################
-		# (4) Sign the URL using the HMAC-SHA1 algorithm and decode to binary.
-		#     Note: hmac requires the raw=T argument for the Google key
-
-		# Define hash/encoding function
-		hmac_sha1 <- function(key, string) {
-			hash  <- digest::hmac(key, string, "sha1", raw = TRUE)
-			base64enc::base64encode(hash)
-		}
-		if (verbose)
-			cat("\nEncoding the private key")
-
-		x$enc_sig <-
-			sapply(x[, 'tosign'],  function(x)
-				hmac_sha1(b64dkey, x))
-		#####################################################################
-
-		#####################################################################
-		# (5) Encode the binary into url-safe Base64 for the signature.
-
-		x$enc_sig_url <- sapply(x[, 'enc_sig'], function(x)
-			gsub("+", "-", fixed = T, gsub("/", "_", x, fixed = T)))
-		#####################################################################
-
-		#####################################################################
-		# (6) Build the fully formed, signed URLs
-
-		x$full_url <- with(x, paste0(domain, tosign, "&signature=", enc_sig_url))
-		#####################################################################
-
-		#####################################################################
-		# (7) Save out signatures to debug any malformed/failed addresses.
-
-		if (verbose & sigfile)
-			cat("\nSaving URL signature file for debugging")
-		if (sigfile) saveRDS(x,  file = sigfile_loc)
-		#####################################################################
-
-		#####################################################################
-		# (8) Return the vector
-
-		fullurl <- x$full_url
-		return(fullurl)
+	if(gmode == "geocode"){
+		x$tosign <- with(x, paste0(url, address, client))
+	} else if (gmode == "dtime") {
+		x$tosign <- with(x, paste0(url, address,
+								   "&destinations=", dest,
+								   "&units=", tolower(units),
+								   "&mode=", tolower(travel_mode),
+								   "&language=", language, client))
 	}
 
 
+	#####################################################################
+	# (3) Encode the private key in "url-safe" Base64.
+	#     Note 1: "url-safe" keys replace '+' and '/' with '-' and '_' respectively.
+	#     Note 2: base::base64decode does not work; base64Decode from RCurl needed.
+	#     Note 3: RCurl's base64Decoder is not URL safe; therefore, gsub is needed.
+	#See: http://stackoverflow.com/questions/28376071/url-safe-base64-decoding-for-r
+
+	b64dkey   <- RCurl::base64Decode(gsub("-", "+", gsub("_", "/", privkey)))
+	x$b64dkey <- b64dkey
+
+	#####################################################################
+	# (4) Sign the URL using the HMAC-SHA1 algorithm and decode to binary.
+	#     Note: hmac requires the raw=T argument for the Google key
+
+	# Define hash/encoding function
+	hmac_sha1 <- function(key, string) {
+		hash  <- digest::hmac(key, string, "sha1", raw = TRUE)
+		base64enc::base64encode(hash)
+	}
+
+	if (verbose) cat("\t* Building the digital signatures\n")
+
+	x$enc_sig <- vapply(x[, 'tosign'],  function(x)
+			hmac_sha1(b64dkey, x), character(1), USE.NAMES=FALSE)
+
+	#####################################################################
+
+	#####################################################################
+	# (5) Reformat the signature with url-safe Base64.
+
+	x$enc_sig_url <- vapply(x[, 'enc_sig'], function(x)
+		gsub("+", "-", fixed = T, gsub("/", "_", x, fixed = T)),
+		character(1), USE.NAMES=FALSE)
+
+	#####################################################################
+
+	#####################################################################
+	# (6) Build the fully formed, signed URLs
+
+	x$full_url <- with(x, paste0(domain, tosign, "&signature=", enc_sig_url))
+
+	#####################################################################
+
+	#####################################################################
+	# (7) Return the key or full data frame for debugging
+
+	if(debug){
+		x <- cbind(raw=urltools::url_decode(x$locations), x)
+		return(x)
+	} else {
+		return(as.vector(x$full_url, mode="character"))
+	}
+
+}
 

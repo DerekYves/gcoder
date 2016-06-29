@@ -2,18 +2,19 @@
 % Please edit documentation in R/address_cleaner.R
 \name{address_cleaner}
 \alias{address_cleaner}
-\title{Performs common character transformations to a data frame of
+\title{Performs character transformations on a vector of
 addresses in order to build "web-safe" URLs for the Google API.}
 \usage{
 address_cleaner(address, verbose = TRUE)
 }
 \arguments{
-\item{address}{A data frame of addresses fields, generally of the form: address, city, state, postal code, country.}
+\item{address}{A raw 1xN vector of UTF-8 encoded addresses.
+Note: these addresses should be in raw form, \emph{not} URL encoded (e.g., of the form: 123 Main Street, Somewhere, NY 12345 USA)(country is optional but recommended).}
 
 \item{verbose}{Displays additional progress output}
 }
 \description{
-This function scrubs a data frame of addresses (e.g., one of the form: address, city, state, postal code, country)
+This function scrubs a vector of addresses (e.g., a vector of the form: address, city, state, postal code, country)
 of character values that may inhibit sucessful geocoding with the \href{https://developers.google.com/maps/documentation/geocoding/start}{Google maps API}.
 Specifically, this function:
 \itemize{
@@ -27,7 +28,7 @@ Specifically, this function:
   }
 }
 \details{
-Note: We recommend closely reviewing the output of this function against the original to ensure that these
-  transformations comport with the issues (if any) found in your address list.
+Note: We recommend reviewing the output of this function against the original vector to ensure the
+  transformations it performs resolve the formatting issues (if any) found in your source data.
 }
 

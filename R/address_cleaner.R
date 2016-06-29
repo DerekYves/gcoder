@@ -1,7 +1,7 @@
-#' Performs common character transformations to a data frame of
+#' Performs character transformations on a vector of
 #' addresses in order to build "web-safe" URLs for the Google API.
 #'
-#' This function scrubs a data frame of addresses (e.g., one of the form: address, city, state, postal code, country)
+#' This function scrubs a vector of addresses (e.g., a vector of the form: address, city, state, postal code, country)
 #' of character values that may inhibit sucessful geocoding with the \href{https://developers.google.com/maps/documentation/geocoding/start}{Google maps API}.
 #' Specifically, this function:
 #' \itemize{
@@ -14,71 +14,68 @@
 #'   \item {Remove various permutations of the "c/o" flag}
 #'   }
 #'
-#'   Note: We recommend closely reviewing the output of this function against the original to ensure that these
-#'   transformations comport with the issues (if any) found in your address list.
+#'   Note: We recommend reviewing the output of this function against the original vector to ensure the
+#'   transformations it performs resolve the formatting issues (if any) found in your source data.
 
-#' @param address A data frame of addresses fields, generally of the form: address, city, state, postal code, country.
+#' @param address A raw 1xN vector of UTF-8 encoded addresses.
+#' Note: these addresses should be in raw form, \emph{not} URL encoded (e.g., of the form: 123 Main Street, Somewhere, NY 12345 USA)(country is optional but recommended).
 #' @param verbose Displays additional progress output
 
 #' @importFrom stringi stri_trans_general
 #' @export
 
-address_cleaner <- function(address, verbose = TRUE) {
+address_cleaner <- function(address, verbose = TRUE){
+
+	# Input validation
+	if(!is.vector(address, mode="character")) stop("Address must be a character vector!")
 
 	# Replace non-breaking spaces with " "
-	if (verbose)
-		cat("\nReplacing non-breaking spaces")
-	address <- as.data.frame(sapply(address, function(x)
-		gsub(intToUtf8(160), " ", x)))
+	if (verbose) cat("\t* Replacing non-breaking spaces\n")
+	address <- vapply(address, function(x)
+		gsub(intToUtf8(160), " ", x), character(1), USE.NAMES = FALSE)
 
 	# Remove ASCII control characters (\001-\031 and \177)
-	if (verbose)
-		cat("\nRemoving control characters")
-	address <- as.data.frame(sapply(address, function(x)
-		gsub("[\001-\031\177]", " ", x)))
+	if (verbose) cat("\t* Removing control characters\n")
+	address <- vapply(address, function(x)
+		gsub("[\001-\031\177]", " ", x), character(1), USE.NAMES = FALSE)
 
-	# Trim runs of spaces and spaces which begin/end a string
-	if (verbose)
-		cat("\nRemoving leading/trailing spaces, and runs of spaces")
+	# Trim runs of spaces and spaces which lead/trail a string
+	if (verbose) cat("\t* Removing leading/trailing spaces, and runs of spaces\n")
 	trim <- function(x)
 		return(gsub("^ +|(?<= ) +| +$", "", x, perl = T))
-	address <- as.data.frame(sapply(address, function(x)
-		trim(x)))
+	address <- vapply(address, function(x)
+		trim(x), character(1), USE.NAMES = FALSE)
 
-	# Strip latin1 characters from the matrix
-	if (verbose)
-		cat("\nTransliterating latin1 characters")
-	address <- as.data.frame(sapply(address,
-									function(x) stri_trans_general(x, "Latin-ASCII")))
+	# Strip latin1 characters
+	if (verbose) cat("\t* Transliterating latin1 characters\n")
+	address <- vapply(address, function(x)
+		stringi::stri_trans_general(x, "Latin-ASCII"),
+		character(1), USE.NAMES = FALSE)
 
 	# Convert special addressing charecters
-	if (verbose)
-		cat("\nConverting special address markers")
-	address <- as.data.frame(sapply(address, function(x)
-		gsub("½", "1/2", fixed = T, gsub("ª", "a", fixed = T,
-										gsub("º", "o", x, fixed = T))
-		)))
+	if (verbose) cat("\t* Converting special address markers\n")
+	address <- vapply(address, function(x)
+		gsub("½", "1/2", fixed = T,
+			 gsub("ª", "a", fixed = T,
+			 	 gsub("º", "o", x, fixed = T))),
+		character(1), USE.NAMES = FALSE)
 
 	# Remove remaining non-ASCII characters and replace with " "
-	if (verbose)
-		cat("\nRemoving all remaining non-ASCII characters")
-	address <- as.data.frame(sapply(address,
-									function(x)
-										iconv(x, 'ASCII', sub = " ")))
+	if (verbose) cat("\t* Removing all remaining non-ASCII characters\n")
+	address <- vapply(address, function(x) iconv(x, 'ASCII', sub = " "),
+					  character(1), USE.NAMES = FALSE)
 
 	# Remove leading, trailing, and repeated commas
-	if (verbose)
-		cat("\nRemoving leading, trailing, and repeated commas")
-	address <- as.data.frame(sapply(address, function(x)
-		gsub("^,*|(?<=,),|,*$", "", x, perl = T)))
+	if (verbose) cat("\t* Removing leading, trailing, and repeated commas\n")
+	address <- vapply(address, function(x) gsub("^,*|(?<=,),|,*$", "", x, perl = T),
+					  character(1), USE.NAMES = FALSE)
 
 	# Remove "c/o" flag
-	if (verbose)
-		cat("\nRemoving various c/o string patterns")
-	address <- as.data.frame(sapply(address, function(x)
-		gsub("c/o|c/0|c/", "", x, perl = T, ignore.case = T)))
+	if (verbose) cat("\t* Removing various c/o string patterns\n")
+	address <- vapply(address, function(x)
+		gsub("c/o|c/0|c/", "", x, perl = T, ignore.case = T),
+		character(1), USE.NAMES = FALSE)
 
-	#Recode empty strings to NA to avoid excess commas in the paste operation
-	address[address == ""]  <- NA
+	address <- unlist(address, use.names=FALSE)
 	return(address)
 }

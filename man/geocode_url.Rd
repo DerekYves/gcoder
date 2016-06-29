@@ -2,29 +2,54 @@
 % Please edit documentation in R/geocode_url.R
 \name{geocode_url}
 \alias{geocode_url}
-\title{Geocode an address vector using the (paid) Google for Work API.}
+\title{Geocode an address vector using the Google Maps API.}
 \usage{
-geocode_url(address, verbose = FALSE, add_date = TRUE, fuzzy = FALSE)
+geocode_url(address, auth = "standard_api", privkey = NULL,
+  clientid = NULL, clean = FALSE, verbose = FALSE, add_date = "none")
 }
 \arguments{
-\item{address}{A "url-safe" vector of fully formed URLs that are encoded with your private Google key (see: \code{\link{google_encode64}}).}
+\item{address}{A 1xN vector of address(es) with "url-safe" characters. Enabling the "clean" parameter (see below) will strip or replace common character patterns in this vector that are incompatible with the Maps API.
+Note: addresses should be in raw form, \emph{not} URL encoded (e.g., of the form: 123 Main Street, Somewhere, NY 12345, USA). Note: country is optional but recommended.}
 
-\item{verbose}{Display additional output in the returns from Google?}
+\item{auth}{character string; one of: "standard_api" (the default), or "work".
+In this function, authentication via the standard API requires a (free) \href{https://developers.google.com/maps/documentation/javascript/get-api-key#get-an-api-key}{Google API key}.
+Authentication via the "work" method requires the client ID and private API key associated with your (paid) \href{https://www.google.com/work/}{Google for Work} account.}
 
-\item{add_date}{Adds a column with today's date to the returned data.frame.}
+\item{privkey}{character string; your Google API key (whether of the "work" or "standard_api" variety).}
 
-\item{fuzzy}{Uses \code{\link{runif}} to add a random number of days between 1 and 30 to the current date when add_date is TRUE. This can be useful to avoid sending large batches if your scripts recertify/retry geocoding after a fixed number of days.}
+\item{clientid}{character string; your Google for Work client ID (generally, these are of the form 'gme-[company]')
+This parameter should \emph{not} be set when authenticating through the standard API.}
+
+\item{clean}{logical; when \emph{TRUE}, applies \code{\link{address_cleaner}} to the address vector prior to URL encoding.}
+
+\item{verbose}{logical; when \emph{TRUE}, displays additional output in the returns from Google.}
+
+\item{add_date}{character string; "none" (the default) or one of: "today", "fuzzy". When set to "today", a column named \emph{geocode_dt} with today's calendar date is added to the returned data frame.
+When set to "fuzzy", a random positive number of days between 1 and 30 is added to \emph{geocode_dt}. This can be useful to avoid sending large batches of geocode requests if your scripts recertify/retry geocoding after a fixed period of time.}
 }
 \description{
-This function attempts to geocode a vector of physical addresses using Google's
-(paid) \href{https://www.google.com/work/}{Google for Work API}. A version of this
-function is discussed in # A version of this function is discussed
-\href{http://stackoverflow.com/questions/3257441/geocoding-in-r-with-google-maps}{in this thread}.
-This modified version of the function retains additional parameters in the JSON-formatted return:
-modified version adds to parameters from the JSON return:
+geocode_url uses the Google Maps API to estimate latitude and longitude coordinates for a character vector of physical addresses.
+Optionally, one may use their (paid) \href{https://www.google.com/work/}{Google for Work} API key to sign the request with the \code{\link{hmac}} sha1 algorithm.
+For smaller batch requests, it is also possible to access Google's "standard API"
+with this function (see \href{https://developers.google.com/maps/documentation/javascript/get-api-key#get-an-api-key}{this page} to obtain a free API key).
+Geocode_url returns a data.frame with (numeric) lat/long coordinates and two additional parameters from the response object (see \href{https://developers.google.com/maps/documentation/geocoding/intro#GeocodingResponses}{this page} for additional information):
 \itemize{
-  \item \emph{location_type}
-  \item \emph{status}
+  \item \strong{location_type:} an estimate of the response object's coordinate accuracy. Currently, these are:
+  \itemize{
+  \item ROOFTOP: indicates that the returned result is accurate to the level of precise street address.
+  \item RANGE_INTERPOLATED: indicates that the returned result reflects an approximation (usually on a road) interpolated between two precise points (such as intersections). Interpolated results are generally returned when rooftop geocodes are unavailable for a street address.
+  \item GEOMETRIC_CENTER: indicates that the returned result is the geometric center of a result such as a polyline (for example, a street) or polygon (region).
+  \item APPROXIMATE: indicates that the returned result is approximate.
+  }
+  \item \strong{status:} the gecode status of a response object. Currently, these are:
+  \itemize{
+  \item \emph{OK:} indicates that no errors occurred; the address was successfully parsed and at least one geocode was returned.
+  \item \emph{ZERO_RESULTS:} indicates that the geocode was successful but returned no results. This may occur if the geocoder was passed a non-existent address.
+  \item \emph{OVER_QUERY_LIMIT:} indicates that you are over your quota.
+  \item \emph{REQUEST_DENIED:} indicates that your request was denied.
+  \item \emph{INVALID_REQUEST:} Indicates that some part of the query (address, URL components, etc.) is missing.
+  \item \emph{UNKNOWN_ERROR:} indicates that the request could not be processed due to a server error. The request may succeed if you try again.
+  }
   }
 }
 

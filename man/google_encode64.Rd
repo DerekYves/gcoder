@@ -2,28 +2,53 @@
 % Please edit documentation in R/google_encode64.R
 \name{google_encode64}
 \alias{google_encode64}
-\title{Build fully formed URLs for geocoding using one's Google for Work private API key.}
+\title{Generates digital signatures for Google Maps API calls.}
 \usage{
-google_encode64(address, privkey, clientid, sigfile = FALSE,
-  sigfile_loc = NULL, verbose = FALSE)
+google_encode64(address, dest = NULL, gmode = "geocode", privkey = NULL,
+  clientid = NULL, debug = FALSE, verbose = FALSE,
+  travel_mode = "driving", units = "metric", language = "en-EN")
 }
 \arguments{
-\item{address}{A 1xN locations vector with UTF-8 encoded ASCII-characters (see: ).}
+\item{address}{A 1xN vector of UTF-8 \emph{url encoded} addresses (if gmode='dtime', this is the origin address).}
 
-\item{privkey}{Your Google for Work API key}
+\item{dest}{If gmode is 'dtime', this is the destination address.}
 
-\item{clientid}{This parameter is generall of the form 'gme-[company]'}
+\item{gmode}{character string; must be either "geocode" (the default) or "dtime" (for distance requests).}
 
-\item{sigfile}{Save out a complete file of locations and URL signatures (this can be useful for debugging malformed URLs)?}
+\item{privkey}{character string; your Google for Work API key}
 
-\item{sigfile_loc}{A fully formed folder/file location to save the function's output. If NULL and sigfile=TRUE, file is saved as "signature_file_[date-time].Rds" in the current working directory.}
+\item{clientid}{character string; generally, this ID will be of the form 'gme-[company]'.}
 
-\item{verbose}{Displays additional progress output}
+\item{debug}{logical; when \emph{TRUE}, returns a complete data frame of locations and their associated URL signatures (this can be useful for debugging invalid signatures).}
+
+\item{verbose}{logical; when \emph{TRUE}, displays additional progress output.}
+
+\item{travel_mode}{character string; currently, valid values include (\href{https://developers.google.com/maps/documentation/javascript/distancematrix#distance_matrix_requests}{see this page for details}):
+\itemize{
+\item driving (the default): indicates standard driving directions using the road network.
+\item transit: requests directions via public transit routes.
+\item walking: requests walking directions via pedestrian paths & sidewalks (where available).
+\item bicycling: requests bicycling directions via bicycle paths & preferred streets (currently only available in the US and some Canadian cities).
+      }}
+
+\item{units}{character string; must be either "metric" (the default) or "imperial".
+Specifying "metric" will return distance between origin and destination as kilometers,
+whereas "imperial" returns distance in miles. For geocode requests this parameter
+is ignorned if non-null.}
+
+\item{language}{character string; localization of the returned object. This set to "en-EN" by default, but refer to
+\href{https://developers.google.com/maps/faq#using-google-maps-apis}{this page}
+for an up-to-date list of all supported languages.}
 }
 \description{
-This function creates a fully formed vector of URLs encoded with your
-\href{https://www.google.com/work/}{Google for Work} private API key.
+This function, primarily, is a helper for \code{\link{drive_time}} and \code{\link{geocode_url}}.
+It is only necessary when building digital signatures with the private cryptographic key associated with
+your (paid) \href{https://www.google.com/work/}{Google for Work} account. To build valid signatures your vector of addresses must be url
+encoded (see: \code{\link{url_encode}} and contain "web-safe" UTF-8 characters
+(see: \code{\link{address_cleaner}}). For basic geocoding and distance analyses it is generally easier to use \code{\link{drive_time}} and \code{\link{geocode_url}}
+to encode a request with your Google for Work private key. However, and particularly with large batch jobs,
+it can be useful to inspect the output of this function for malformed values which yield invalid signatures (see the "sigfile" option).
 The general pattern of this function follows the \href{https://developers.google.com/maps/documentation/business/image/auth?hl=en}{Google Developer documention}
-for generating a digital signature. Prior to applying this function you may need to strip your address vector of non-URL-safe string values (see: ).
+for generating a digital signature witgh Python.
 }
 
