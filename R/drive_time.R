@@ -4,7 +4,43 @@
 #' Optionally, one may use a (paid) \href{https://www.google.com/work/}{Google for Work} API key to sign the request with the \code{\link{hmac}} sha1 algorithm.
 #' For smaller batch requests, it is also possible to access Google's "standard API"
 #' with this function (see \href{https://developers.google.com/maps/documentation/javascript/get-api-key#get-an-api-key}{this page} to obtain a free API key).
-#' Drive_time returns a data frame with the following parameters stored from the response object:
+
+#' @param address A 1xN vector of locations. These may be either (1) latitude and longitude coordinates
+#'        (formatted as "lat,long" with no spaces) or physical addresses that contain "url-safe" UTF-8 characters.
+#'        Enabling the "clean" parameter (see below) attempts to strip or replace common character patterns
+#'        from physical addresses that are incompatible with the Maps API key.
+#'        This vector becomes the starting point of the distance calculation.
+#'        If the length of this parameter is 1 and destination's length is greater than 1, address is replicated to match the length of destination
+#'        (e.g., when you are calculating distances between one specific location and two or more destinations).
+#'        Note: addresses should be in raw form, \emph{not} URL encoded (e.g., of the form: 123 Main Street, Somewhere, NY 12345 USA)(country is optional but recommended).
+#' @param dest A 1xN vector of destinations. These may be either (1) latitude and longitude coordinates
+#'        (formatted as "lat,long" with no spaces) or physical addresses that contain "url-safe" UTF-8 characters.
+#' @param auth character string; one of: "work" (the default), or "standard_api".
+#'        While you may specify and empty string for privkey when using the standard API, for some direction types (e.g., transit) a (free) API key from Google is required (see \href{https://developers.google.com/maps/documentation/javascript/get-api-key#get-an-api-key}{this page}.
+#'        Authentication via the "work" method requires the private API key associated with your (paid) \href{https://www.google.com/work/}{Google for Work} account.
+#' @param privkey character string; your Google API key (whether of the "work" or "standard_api" variety).
+#' @param clientid character string; your Google for Work client id (generally of the form 'gme-[company]')
+#'        This parameter should not be set when authenticating through the standard API.
+#' @param clean logical; when \emph{TRUE}, applies \code{\link{address_cleaner}} to the address and destination vectors.
+#' @param travel_mode character string; currently, valid values include (\href{https://developers.google.com/maps/documentation/javascript/distancematrix#distance_matrix_requests}{see this page for details}):
+#'   \itemize{
+#'   \item driving (the default): indicates standard driving directions using the road network.
+#'   \item transit: requests directions via public transit routes (requires and API key).
+#'   \item walking: requests walking directions via pedestrian paths & sidewalks (where available).
+#'   \item bicycling: requests bicycling directions via bicycle paths & preferred streets (currently only available in the US and some Canadian cities).
+#'         }
+#' @param units character string; must be either "metric" (the default) or "imperial".
+#' Specifying "metric" will return distance between origin and destination as kilometers,
+#' whereas "imperial" returns distance in miles. For geocode requests this parameter
+#' is ignorned if non-null.
+#' @param verbose logical; when \emph{TRUE}, displays additional progress output.
+#' @param add_date character string; one of: "none" (the default), "today", or "fuzzy". When set to "today", a column with today's calendar date is added to the returned data frame.
+#'        When set to "fuzzy", a random positive number of days between 1 and 30 is added to this date column. "Fuzzy" date values can be useful to avoid sending large batches of geocode requests on the same day if your scripts recertify/retry distance calculations after a fixed period of time.
+#' @param language character string; localization of the returned object. This set to "en-EN" by default, but refer to
+#' \href{https://developers.google.com/maps/faq#using-google-maps-apis}{this page}
+#' for an up-to-date list of all supported languages.
+
+#' @return #' Drive_time returns a data frame with the following parameters stored from the response object:
 #' \itemize{
 #'   \item \strong{distance:} The distance between address[\emph{i}] and dest[\emph{i}] in kilometers.
 #'   \item \strong{travel_time:} The estimated travel time given the specified mode of transportation.
@@ -18,36 +54,38 @@
 #'   \item \emph{UNKNOWN_ERROR:} indicates that the request could not be processed due to a server error. The request may succeed if you try again.
 #'   }
 #'   }
-#' @param address A 1xN vector of address(es) with "url-safe" characters. Enabling the "clean" parameter (see below) attempts to strip or replace common character patterns that are incompatible with the Maps API key.
-#'        This vector becomes the starting point of the distance calculation.
-#'        If the length of this parameter is 1 and destination's length is greater than 1, address is replicated to match the length of destination
-#'        (e.g., when you are calculating distances between one specific location and two or more destinations).
-#'        Note: addresses should be in raw form, \emph{not} URL encoded (e.g., of the form: 123 Main Street, Somewhere, NY 12345 USA)(country is optional but recommended).
-#' @param dest A 1xN vector of destination address(es) with "url-safe" characters.
-#' @param auth character string; one of: "work" (the default), or "standard_api".
-#'        Authentication via the "stadard_api" method requires a (free) \href{https://developers.google.com/maps/documentation/javascript/get-api-key#get-an-api-key}{Google API key}.
-#'        Authentication via the "work" method requires the private API key associated with your (paid) \href{https://www.google.com/work/}{Google for Work} account.
-#' @param privkey character string; your Google API key (whether of the "work" or "standard_api" variety).
-#' @param clientid character string; your Google for Work client id (generally of the form 'gme-[company]')
-#'        This parameter should not be set when authenticating through the standard API.
-#' @param clean logical; when \emph{TRUE}, applies \code{\link{address_cleaner}} to the address and destination vectors.
-#' @param travel_mode character string; currently, valid values include (\href{https://developers.google.com/maps/documentation/javascript/distancematrix#distance_matrix_requests}{see this page for details}):
-#'   \itemize{
-#'   \item driving (the default): indicates standard driving directions using the road network.
-#'   \item transit: requests directions via public transit routes.
-#'   \item walking: requests walking directions via pedestrian paths & sidewalks (where available).
-#'   \item bicycling: requests bicycling directions via bicycle paths & preferred streets (currently only available in the US and some Canadian cities).
-#'         }
-#' @param units character string; must be either "metric" (the default) or "imperial".
-#' Specifying "metric" will return distance between origin and destination as kilometers,
-#' whereas "imperial" returns distance in miles. For geocode requests this parameter
-#' is ignorned if non-null.
-#' @param verbose logical; when \emph{TRUE}, displays additional progress output.
-#' @param add_date character string; "none" (the default) or one of: "today", "fuzzy". When set to "today", a date class column named \emph{geocode_dt} is added to the returned data frame with today's date.
-#'        When set to "fuzzy" a random positive number of days between 1 and 30 is added to the returned date. This can be useful to avoid sending large batches of geocode requests if your scripts recertify/retry geocoding after a fixed period of time.
-#' @param language character string; localization of the returned object. This set to "en-EN" by default, but refer to
-#' \href{https://developers.google.com/maps/faq#using-google-maps-apis}{this page}
-#' for an up-to-date list of all supported languages.
+
+#' @examples
+#' # Bike from the White House to Google!
+#' address <- c("1600 Pennsylvania Ave NW, Washington, DC 20500, USA",
+#' 			 "1600 Amphitheatre Pkwy, Mountain View, CA 94043, USA")
+#'
+#' coordset <- geocode_url(address, auth="standard_api", privkey="",
+#'             clean=TRUE, add_date='today', verbose=TRUE)
+#'
+#' # Save coordinates. Google requires a format of: "lat,lng" (with no spaces)
+#' from <- paste(coordset$lat[1],coordset$lng[1], sep=",")
+#' dest <- paste(coordset$lat[2],coordset$lng[2], sep=",")
+#'
+#' # Get the travel time by bike (a mere 264 hours!) and distance in miles:
+#' howfar_miles <- drive_time(address=from, dest=dest, auth="standard_api",
+#' 						   privkey="", clean=FALSE, add_date='today',
+#' 						   verbose=FALSE, travel_mode="bicycling",
+#' 						   units="imperial")
+#'
+#' # Get the distance in kilometers using physical addresses instead of lat/lng:
+#' howfar_kms <- drive_time(
+#'      address="1600 Pennsylvania Ave NW, Washington, DC 20500, USA",
+#' 		dest="1600 Amphitheatre Pkwy, Mountain View, CA 94043",
+#' 		auth="standard_api", privkey="", clean=FALSE,
+#' 		add_date='today', verbose=FALSE, travel_mode="bicycling",
+#' 		units="metric"
+#' 		)
+#'
+#' with(howfar_kms, cat("Travelling from the White House to ", destination,
+#' 					 ":\n", dist_txt, "\n", time_txt, sep=""))
+
+
 
 #' @importFrom RJSONIO fromJSON
 #' @importFrom RCurl getURL
@@ -94,8 +132,8 @@ drive_time <- function(address, dest, auth="standard_api", privkey=NULL,
 	address <- not_nambia(address); dest <- not_nambia(dest)
 
 	# Encode the URLs
-	enc <- urltools::url_encode(address)
-	dest    <- urltools::url_encode(dest)
+	enc  <- urltools::url_encode(address)
+	dest <- urltools::url_encode(dest)
 
 	if(auth=="standard_api") {
 		inbound <- data.frame(address=enc, dest=dest)
@@ -126,7 +164,8 @@ drive_time <- function(address, dest, auth="standard_api", privkey=NULL,
 	json  <- lapply(doc, RJSONIO::fromJSON, simplify=FALSE)
 
 	coord <- t(vapply(json, function(x) {
-		if(x$rows[[1]]$elements[[1]]$status=="OK") {
+		if(x$status=="OK"){
+			if(x$rows[[1]]$elements[[1]]$status=="OK"){
 			origin      <- as.character(x$origin_addresses)
 			destination <- as.character(x$destination_addresses)
 			# Distance is returned as meters, regardless of the "unit" API call.
@@ -139,6 +178,9 @@ drive_time <- function(address, dest, auth="standard_api", privkey=NULL,
 			time_txt    <- as.character(x$rows[[1]]$elements[[1]]$duration$text)
 			status      <- as.character(x$rows[[1]]$elements[[1]]$status)
 			return(c(origin, destination, dist_num, dist_txt, time_secs, time_mins, time_hours, time_txt, status))
+			}
+		} else if(x$status=="REQUEST_DENIED"){
+			return(c(NA, NA, NA, NA, NA, NA, NA, NA, "REQUEST_DENIED"))
 		} else {
 			return(c(as.character(x$origin_addresses), as.character(x$destination_addresses), NA, NA, NA, NA, NA, NA, as.character(x$rows[[1]]$elements[[1]]$status)))
 		}

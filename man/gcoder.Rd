@@ -14,9 +14,9 @@ of a physical address). Currently, Google provides scripts and functions written
 in other languages (Python, Ruby, etc.) to generate the cryptogric signatures needed to
 access the non-free Maps API, but does not offer a script for the R language
 (hence the motivation for this package's authorship).
-Google's paid accounts have much large quota limits than the "standard_api"
-and, for this reason, gcoder may be useful to indivuals needing to submit
-large batch jobs to the Google Maps API but who prefer to work directly within R.
+Google's paid accounts have much larger quota limits than the "standard_api" and,
+for this reason, gcoder may be useful for indivuals needing to submit large batch
+jobs to the Google Maps API from directly within R.
 While the main benefit of this package is it's ability to generate properly
 signed URLs with the \code{\link{hmac}} sha1 algorithm, it
 also provides methods for accessing the standard API using a (free)

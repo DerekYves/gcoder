@@ -1,9 +1,11 @@
+#' A general address cleaner.
+#'
 #' Performs character transformations on a vector of
 #' addresses in order to build "web-safe" URLs for the Google API.
 #'
 #' This function scrubs a vector of addresses (e.g., a vector of the form: address, city, state, postal code, country)
 #' of character values that may inhibit sucessful geocoding with the \href{https://developers.google.com/maps/documentation/geocoding/start}{Google maps API}.
-#' Specifically, this function:
+#' Specifically, address_cleaner:
 #' \itemize{
 #'   \item {Replaces non-breaking spaces with " "}
 #'   \item {Removes ASCII control characters (001-031 and 177)}
@@ -20,6 +22,14 @@
 #' @param address A raw 1xN vector of UTF-8 encoded addresses.
 #' Note: these addresses should be in raw form, \emph{not} URL encoded (e.g., of the form: 123 Main Street, Somewhere, NY 12345 USA)(country is optional but recommended).
 #' @param verbose Displays additional progress output
+#' @return address_cleaner returns a character vector of addresses of the same length as the input.
+#' @examples
+#' # Clean an incompatible vector of addresses
+#' address <- c(" 1600 Pennsylvania Ave NW ½, Washington, DC 20500, USA ",
+#' 			 "  ª1600  Amphitheatre Pkwy,  Mountain View, CA 94043, USA")
+#'
+#' # View the return:
+#' address_cleaner(address)
 
 #' @importFrom stringi stri_trans_general
 #' @export

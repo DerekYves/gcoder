@@ -4,16 +4,30 @@
 #' Optionally, one may use their (paid) \href{https://www.google.com/work/}{Google for Work} API key to sign the request with the \code{\link{hmac}} sha1 algorithm.
 #' For smaller batch requests, it is also possible to access Google's "standard API"
 #' with this function (see \href{https://developers.google.com/maps/documentation/javascript/get-api-key#get-an-api-key}{this page} to obtain a free API key).
-#' Geocode_url returns a data.frame with (numeric) lat/long coordinates and two additional parameters from the response object (see \href{https://developers.google.com/maps/documentation/geocoding/intro#GeocodingResponses}{this page} for additional information):
+
+#' @param address A 1xN vector of address(es) with "url-safe" characters. Enabling the "clean" parameter calls the \code{\link{address_cleaner}} function will strip or replace common character patterns in the vector that are incompatible with the Maps API.
+#'        Note: addresses should be in raw form, \emph{not} URL encoded (e.g., of the form: 123 Main Street, Somewhere, NY 12345, USA). \emph{Note: country is optional but recommended}.
+#' @param auth character string; one of: "standard_api" (the default) or "work".
+#'        Authentication via the standard API requires a (free) \href{https://developers.google.com/maps/documentation/javascript/get-api-key#get-an-api-key}{Google API key}.
+#'        Authentication via the "work" method requires the client ID and private API key associated with your (paid) \href{https://www.google.com/work/}{Google for Work} account.
+#' @param privkey character string; your Google API key (whether of the "work" or "standard_api" variety).
+#' @param clientid character string; your Google for Work client ID (generally, these are of the form 'gme-[company]')
+#'        This parameter should \emph{not} be set when authenticating through the standard API.
+#' @param clean logical; when \emph{TRUE}, applies \code{\link{address_cleaner}} to the address vector prior to URL encoding.
+#' @param verbose logical; when \emph{TRUE}, displays additional output in the returns from Google.
+#' @param add_date character string; one of: "none" (the default), "today", or "fuzzy". When set to "today", a column with today's calendar date is added to the returned data frame.
+#'        When set to "fuzzy", a random positive number of days between 1 and 30 is added to this date column. "Fuzzy" date values can be useful to avoid sending large batches of geocode requests on the same day if your scripts recertify/retry geocode estimations after a fixed period of time.
+
+#' @return Geocode_url returns a data frame with (numeric) lat/long coordinates and two additional parameters from the response object (see \href{https://developers.google.com/maps/documentation/geocoding/intro#GeocodingResponses}{this page} for additional information):
 #' \itemize{
-#'   \item \strong{location_type:} an estimate of the response object's coordinate accuracy. Currently, these are:
+#'   \item \strong{location_type:} an estimate of the response object's coordinate accuracy. Currently, possible response values are:
 #'   \itemize{
-#'   \item ROOFTOP: indicates that the returned result is accurate to the level of precise street address.
-#'   \item RANGE_INTERPOLATED: indicates that the returned result reflects an approximation (usually on a road) interpolated between two precise points (such as intersections). Interpolated results are generally returned when rooftop geocodes are unavailable for a street address.
-#'   \item GEOMETRIC_CENTER: indicates that the returned result is the geometric center of a result such as a polyline (for example, a street) or polygon (region).
-#'   \item APPROXIMATE: indicates that the returned result is approximate.
+#'   \item \emph{ROOFTOP:} indicates that the return is accurate to the level of a precise street address.
+#'   \item \emph{RANGE_INTERPOLATED:} indicates that the result reflects an approximation (usually on a road) interpolated between two precise points (such as intersections). Interpolated results are generally returned when rooftop geocodes are unavailable for a street address.
+#'   \item \emph{GEOMETRIC_CENTER:} indicates that the result is the geometric center of a result such as a polyline (for example, a street) or polygon (region).
+#'   \item \emph{APPROXIMATE:} indicates that the result is approximate.
 #'   }
-#'   \item \strong{status:} the gecode status of a response object. Currently, these are:
+#'   \item \strong{status:} the geocode status of a response object. Currently, possible response values are:
 #'   \itemize{
 #'   \item \emph{OK:} indicates that no errors occurred; the address was successfully parsed and at least one geocode was returned.
 #'   \item \emph{ZERO_RESULTS:} indicates that the geocode was successful but returned no results. This may occur if the geocoder was passed a non-existent address.
@@ -23,18 +37,18 @@
 #'   \item \emph{UNKNOWN_ERROR:} indicates that the request could not be processed due to a server error. The request may succeed if you try again.
 #'   }
 #'   }
-#' @param address A 1xN vector of address(es) with "url-safe" characters. Enabling the "clean" parameter (see below) will strip or replace common character patterns in this vector that are incompatible with the Maps API.
-#'        Note: addresses should be in raw form, \emph{not} URL encoded (e.g., of the form: 123 Main Street, Somewhere, NY 12345, USA). Note: country is optional but recommended.
-#' @param auth character string; one of: "standard_api" (the default), or "work".
-#'        In this function, authentication via the standard API requires a (free) \href{https://developers.google.com/maps/documentation/javascript/get-api-key#get-an-api-key}{Google API key}.
-#'        Authentication via the "work" method requires the client ID and private API key associated with your (paid) \href{https://www.google.com/work/}{Google for Work} account.
-#' @param privkey character string; your Google API key (whether of the "work" or "standard_api" variety).
-#' @param clientid character string; your Google for Work client ID (generally, these are of the form 'gme-[company]')
-#'        This parameter should \emph{not} be set when authenticating through the standard API.
-#' @param clean logical; when \emph{TRUE}, applies \code{\link{address_cleaner}} to the address vector prior to URL encoding.
-#' @param verbose logical; when \emph{TRUE}, displays additional output in the returns from Google.
-#' @param add_date character string; "none" (the default) or one of: "today", "fuzzy". When set to "today", a column named \emph{geocode_dt} with today's calendar date is added to the returned data frame.
-#'        When set to "fuzzy", a random positive number of days between 1 and 30 is added to \emph{geocode_dt}. This can be useful to avoid sending large batches of geocode requests if your scripts recertify/retry geocoding after a fixed period of time.
+
+#' @examples
+#' # Get coordinates for the White House and Google
+#' address <- c("1600 Pennsylvania Ave NW, Washington, DC 20500, USA",
+#' 			 "1600 Amphitheatre Pkwy, Mountain View, CA 94043, USA")
+#'
+#' coordset <- geocode_url(address, auth="standard_api", privkey="",
+#'             clean=TRUE, add_date='today', verbose=TRUE)
+#'
+#' # View the returns
+#' print(coordset[ , 1:5])
+
 #' @importFrom RJSONIO fromJSON
 #' @importFrom RCurl getURL
 #' @importFrom stats runif
@@ -57,7 +71,7 @@ geocode_url <- function(address, auth="standard_api", privkey=NULL,
 	if(!grepl("today|fuzzy|none", add_date))
 		stop("Invalid add_date paramater. Must be 'today', 'fuzzy', or 'none'")
 	if(!is.vector(address, mode="character"))
-		stop("Address and destination must be character vectors!")
+		stop("Address must be a character vector!")
 
 
 	# Optionally apply the address clean function
@@ -69,7 +83,7 @@ geocode_url <- function(address, auth="standard_api", privkey=NULL,
 		x[x %in% c("", " ", NA)] <- "INVALID-REQUEST"
 		return(x)
 	}
-	address <- not_nambia(address); dest <- not_nambia(dest)
+	address <- not_nambia(address)
 
 	# Apply url encoding to the raw locations vector
 	enc <- urltools::url_encode(address)

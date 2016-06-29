@@ -2,8 +2,7 @@
 % Please edit documentation in R/address_cleaner.R
 \name{address_cleaner}
 \alias{address_cleaner}
-\title{Performs character transformations on a vector of
-addresses in order to build "web-safe" URLs for the Google API.}
+\title{A general address cleaner.}
 \usage{
 address_cleaner(address, verbose = TRUE)
 }
@@ -13,10 +12,17 @@ Note: these addresses should be in raw form, \emph{not} URL encoded (e.g., of th
 
 \item{verbose}{Displays additional progress output}
 }
+\value{
+address_cleaner returns a character vector of addresses of the same length as the input.
+}
 \description{
+Performs character transformations on a vector of
+addresses in order to build "web-safe" URLs for the Google API.
+}
+\details{
 This function scrubs a vector of addresses (e.g., a vector of the form: address, city, state, postal code, country)
 of character values that may inhibit sucessful geocoding with the \href{https://developers.google.com/maps/documentation/geocoding/start}{Google maps API}.
-Specifically, this function:
+Specifically, address_cleaner:
 \itemize{
   \item {Replaces non-breaking spaces with " "}
   \item {Removes ASCII control characters (001-031 and 177)}
@@ -26,9 +32,16 @@ Specifically, this function:
   \item {Removes leading, trailing, and repeated commas}
   \item {Remove various permutations of the "c/o" flag}
   }
-}
-\details{
+
 Note: We recommend reviewing the output of this function against the original vector to ensure the
   transformations it performs resolve the formatting issues (if any) found in your source data.
+}
+\examples{
+# Clean an incompatible vector of addresses
+address <- c(" 1600 Pennsylvania Ave NW ½, Washington, DC 20500, USA ",
+			 "  ª1600  Amphitheatre Pkwy,  Mountain View, CA 94043, USA")
+
+# View the return:
+address_cleaner(address)
 }
 
