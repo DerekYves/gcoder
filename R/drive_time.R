@@ -5,6 +5,7 @@
 #' For smaller batch requests, it is also possible to access Google's "standard API"
 #' with this function (see \href{https://developers.google.com/maps/documentation/javascript/get-api-key#get-an-api-key}{this page} to obtain a free API key).
 
+
 #' @param address A 1xN vector of locations. These may be either (1) latitude and longitude coordinates
 #'        (formatted as "lat,long" with no spaces) or physical addresses that contain "url-safe" UTF-8 characters.
 #'        Enabling the "clean" parameter (see below) attempts to strip or replace common character patterns
