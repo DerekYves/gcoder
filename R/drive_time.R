@@ -103,7 +103,7 @@ drive_time <- function(address, dest, auth="standard_api", privkey=NULL,
 	if(!grepl("standard_api|work", auth))
 		stop("Invalid auth paramater. Must be 'standard_api' or 'work'.")
 	if(is.null(privkey))
-		stop("You must specify an API key. See: https://developers.google.com/maps/documentation/javascript/get-api-key#get-an-api-key")
+		stop("You must specify a valid API key or an empty string (''). To request a key, see:\n\t https://developers.google.com/maps/documentation/javascript/get-api-key#get-an-api-key")
 	if(auth=="work" & is.null(clientid))
 		stop("You must specify a client ID with the work authentication method!")
 	if(!grepl("driving|bicycling|transit|walking", travel_mode, ignore.case=TRUE))
@@ -116,6 +116,8 @@ drive_time <- function(address, dest, auth="standard_api", privkey=NULL,
 		stop("Address and destination must be character vectors!")
 	if(!grepl("today|fuzzy|none", add_date))
 		stop("Invalid add_date paramater. Must be 'today', 'fuzzy', or 'none'")
+	if(privkey=="" & travel_mode=="transit")
+		stop("You must specify a valid API key to use the transit mode!")
 
 	if(clean){
 		if(verbose) cat("Cleaning origin addresses...\n")
@@ -126,10 +128,11 @@ drive_time <- function(address, dest, auth="standard_api", privkey=NULL,
 
 	#Recode NA's and empty strings to "INVALID_REQUEST" to avoid coding Nambia.
 	not_nambia <- function(x){
-		x[x %in% c("", " ", NA)] <- "INVALID-REQUEST"
+		x[x %in% c("", " ", NA)] <- "INVALIDREQUEST"
 		return(x)
 	}
-	address <- not_nambia(address); dest <- not_nambia(dest)
+	address <- not_nambia(address)
+	dest <- not_nambia(dest)
 
 	# Encode the URLs
 	enc  <- urltools::url_encode(address)
@@ -164,27 +167,34 @@ drive_time <- function(address, dest, auth="standard_api", privkey=NULL,
 	json  <- lapply(doc, RJSONIO::fromJSON, simplify=FALSE)
 
 	coord <- t(vapply(json, function(x) {
-		if(x$status=="OK"){
-			if(x$rows[[1]]$elements[[1]]$status=="OK"){
-			origin      <- as.character(x$origin_addresses)
-			destination <- as.character(x$destination_addresses)
-			# Distance is returned as meters, regardless of the "unit" API call.
-			dist_num    <- as.character(x$rows[[1]]$elements[[1]]$distance$value / 1000)
-			if(units=="imperial") dist_num <- as.character(as.numeric(dist_num) * 0.621371)
-			dist_txt    <- as.character(x$rows[[1]]$elements[[1]]$distance$text)
-			time_secs   <- as.character(x$rows[[1]]$elements[[1]]$duration$value)
-			time_mins   <- as.character(as.numeric(time_secs) * 0.0166667)
-			time_hours  <- as.character(as.numeric(time_secs) * 0.000277778)
-			time_txt    <- as.character(x$rows[[1]]$elements[[1]]$duration$text)
-			status      <- as.character(x$rows[[1]]$elements[[1]]$status)
-			return(c(origin, destination, dist_num, dist_txt, time_secs, time_mins, time_hours, time_txt, status))
-			}
-		} else if(x$status=="REQUEST_DENIED"){
-			return(c(NA, NA, NA, NA, NA, NA, NA, NA, "REQUEST_DENIED"))
-		} else {
-			return(c(as.character(x$origin_addresses), as.character(x$destination_addresses), NA, NA, NA, NA, NA, NA, as.character(x$rows[[1]]$elements[[1]]$status)))
-		}
-	}, character(9)))
+		if(!is.null(x$status)){
+        		if(x$status=="OK"){
+        			if(!is.null(x$rows[[1]]$elements[[1]]$status)){
+        				if(x$rows[[1]]$elements[[1]]$status=="OK"){
+        					origin      <- as.character(x$origin_addresses)
+        					destination <- as.character(x$destination_addresses)
+        					# Distance is returned as meters, regardless of the "unit" API call.
+        					dist_num    <- as.character(x$rows[[1]]$elements[[1]]$distance$value / 1000)
+        					if(units=="imperial") dist_num <- as.character(as.numeric(dist_num) * 0.621371)
+        					dist_txt    <- as.character(x$rows[[1]]$elements[[1]]$distance$text)
+        					time_secs   <- as.character(x$rows[[1]]$elements[[1]]$duration$value)
+        					time_mins   <- as.character(as.numeric(time_secs) * 0.0166667)
+        					time_hours  <- as.character(as.numeric(time_secs) * 0.000277778)
+        					time_txt    <- as.character(x$rows[[1]]$elements[[1]]$duration$text)
+        					status      <- as.character(x$rows[[1]]$elements[[1]]$status)
+        					return(c(origin, destination, dist_num, dist_txt, time_secs, time_mins, time_hours, time_txt, status))
+        				} else {
+        				return(c(rep(NA, 8), x$rows[[1]]$elements[[1]]$status))
+        				}
+        			}
+        			} else {
+        			return(c(rep(NA, 8), x$status))
+        			}
+        		} else {
+        		return(c(rep(NA, 8), "Gcoder message: unknown error in response object, check source data"))
+     		}
+        }, character(9)))
+
 
 	if(is.matrix(coord)){
 		out <- as.data.frame(coord)

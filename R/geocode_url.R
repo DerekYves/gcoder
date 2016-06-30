@@ -65,7 +65,7 @@ geocode_url <- function(address, auth="standard_api", privkey=NULL,
 	if(!grepl("standard_api|work", auth))
 		stop("Invalid auth paramater. Must be 'standard_api' or 'work'.")
 	if(is.null(privkey))
-		stop("You must specify an API key. See: https://developers.google.com/maps/documentation/javascript/get-api-key#get-an-api-key")
+		stop("You must specify a valid API key or an empty string (''). To request a key, see:\n\t https://developers.google.com/maps/documentation/javascript/get-api-key#get-an-api-key")
 	if(auth=="work" & is.null(clientid))
 		stop("You must specify a client ID with the work authentication method!")
 	if(!grepl("today|fuzzy|none", add_date))
